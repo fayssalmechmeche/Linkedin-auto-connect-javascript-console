@@ -12,5 +12,14 @@
     "default_popup": "popup.html",
     "default_icon": "Icone_rond_LinkedIn.png"
   },
-  "permissions": ["activeTab", "scripting"]
+  "permissions": ["activeTab", "scripting", "storage"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/*"],
+      "js": ["content.js"]
+    }
+  ]
 }

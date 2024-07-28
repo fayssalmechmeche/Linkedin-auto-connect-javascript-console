@@ -1,27 +1,33 @@
 let stopScript = false;
 let connectionsMade = 0;
+const CHECK_LIMIT_INTERVAL = 5000; // Intervalle en millisecondes pour vérifier la limite (5 secondes ici)
 
-// Écouter les messages provenant de popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'start') {
         stopScript = false;
+        connectionsMade = 0;
         updateStatus(`En cours - Connexions : ${connectionsMade}`);
-        runScript();
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            chrome.scripting.executeScript({
+                target: { tabId: tabs[0].id },
+                func: runScript
+            });
+        });
     } else if (request.action === 'stop') {
         stopScript = true;
         updateStatus('Inactif');
     }
+    sendResponse({ status: "received" });
 });
 
-async function runScript() {
-    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+function updateStatus(status) {
+    chrome.storage.local.set({ status: status }, () => {
+        chrome.runtime.sendMessage({ action: 'updateStatus', status: status });
+    });
+}
 
-    function clickIfExists(selector) {
-        const element = document.querySelector(selector);
-        if (element) {
-            element.click();
-        }
-    }
+function runScript() {
+    let stopScript = false;
 
     async function handleLimitAlert() {
         const limitAlertSelector = '.artdeco-modal.ip-fuse-limit-alert';
@@ -49,6 +55,15 @@ async function runScript() {
             clickIfExists(okButtonSelector);
             await delay(1000);
             clickIfExists(seeAllButtonSelector);
+        }
+    }
+
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    function clickIfExists(selector) {
+        const element = document.querySelector(selector);
+        if (element) {
+            element.click();
         }
     }
 
@@ -98,33 +113,45 @@ async function runScript() {
         return true;
     };
 
-    while (true) {
-        if (stopScript) {
-            console.log('Script arrêté par l\'utilisateur');
-            updateStatus('Inactif');
-            break;
+    async function checkLimit() {
+        return handleLimitAlert();
+    }
+
+    async function mainLoop() {
+        // Vérification immédiate de la limite au début
+        if (await checkLimit()) {
+            updateStatus('Limite atteinte');
+            return;
         }
 
-        try {
-            const limitReached = await handleLimitAlert();
-            if (limitReached) {
+        while (true) {
+            if (stopScript) {
+                console.log('Script arrêté par l\'utilisateur');
+                updateStatus('Inactif');
                 break;
             }
 
-            await handleModal();
+            try {
+                // Vérification périodique de la limite
+                const limitReached = await checkLimit();
+                if (limitReached) {
+                    updateStatus('Limite atteinte');
+                    break;
+                }
 
-            let buttonsProcessed = await processConnectButtons();
+                await handleModal();
 
-            if (!buttonsProcessed) {
-                await scrollAndWait();
+                let buttonsProcessed = await processConnectButtons();
+
+                if (!buttonsProcessed) {
+                    await scrollAndWait();
+                }
+            } catch (e) {
+                console.error('An error occurred:', e);
+                break;
             }
-        } catch (e) {
-            console.error('An error occurred:', e);
-            break;
         }
     }
-}
 
-function updateStatus(status) {
-    chrome.runtime.sendMessage({ action: 'updateStatus', status: status });
+    mainLoop();
 }
