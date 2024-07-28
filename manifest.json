@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "LinkedIn Auto Connect",
+  "version": "1.0",
+  "description": "Automatically connect with people on LinkedIn",
+  "icons": {
+    "16": "Icone_rond_LinkedIn.png",
+    "48": "Icone_rond_LinkedIn.png",
+    "128": "Icone_rond_LinkedIn.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "Icone_rond_LinkedIn.png"
+  },
+  "permissions": ["activeTab", "scripting"]
+}
