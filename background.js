@@ -1,6 +1,6 @@
 let stopScript = false;
 let connectionsMade = 0;
-const CHECK_LIMIT_INTERVAL = 5000; // Intervalle en millisecondes pour vérifier la limite (5 secondes ici)
+const CHECK_LIMIT_INTERVAL = 1000; // Intervalle en millisecondes pour vérifier la limite (5 secondes ici)
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'start') {
@@ -26,8 +26,15 @@ function updateStatus(status) {
     });
 }
 
-function runScript() {
-    let stopScript = false;
+async function runScript() {
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    function clickIfExists(selector) {
+        const element = document.querySelector(selector);
+        if (element) {
+            element.click();
+        }
+    }
 
     async function handleLimitAlert() {
         const limitAlertSelector = '.artdeco-modal.ip-fuse-limit-alert';
@@ -55,15 +62,6 @@ function runScript() {
             clickIfExists(okButtonSelector);
             await delay(1000);
             clickIfExists(seeAllButtonSelector);
-        }
-    }
-
-    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-    function clickIfExists(selector) {
-        const element = document.querySelector(selector);
-        if (element) {
-            element.click();
         }
     }
 
@@ -113,45 +111,29 @@ function runScript() {
         return true;
     };
 
-    async function checkLimit() {
-        return handleLimitAlert();
-    }
-
-    async function mainLoop() {
-        // Vérification immédiate de la limite au début
-        if (await checkLimit()) {
-            updateStatus('Limite atteinte');
-            return;
+    while (true) {
+        if (stopScript) {
+            console.log('Script arrêté par l\'utilisateur');
+            updateStatus('Inactif');
+            break;
         }
 
-        while (true) {
-            if (stopScript) {
-                console.log('Script arrêté par l\'utilisateur');
-                updateStatus('Inactif');
+        try {
+            const limitReached = await handleLimitAlert();
+            if (limitReached) {
                 break;
             }
 
-            try {
-                // Vérification périodique de la limite
-                const limitReached = await checkLimit();
-                if (limitReached) {
-                    updateStatus('Limite atteinte');
-                    break;
-                }
+            await handleModal();
 
-                await handleModal();
+            let buttonsProcessed = await processConnectButtons();
 
-                let buttonsProcessed = await processConnectButtons();
-
-                if (!buttonsProcessed) {
-                    await scrollAndWait();
-                }
-            } catch (e) {
-                console.error('An error occurred:', e);
-                break;
+            if (!buttonsProcessed) {
+                await scrollAndWait();
             }
+        } catch (e) {
+            console.error('An error occurred:', e);
+            break;
         }
     }
-
-    mainLoop();
 }
