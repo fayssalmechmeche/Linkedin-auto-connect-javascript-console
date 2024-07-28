@@ -92,6 +92,11 @@ async function runScript() {
         }
 
         for (const button of connectButtonsArray) {
+            const limit = await handleLimitAlert();
+            if (limit) {
+                updateStatus('Limite atteinte');
+                return false;
+            }
             if (stopScript) {
                 console.log('Script arrêté par l\'utilisateur');
                 updateStatus('Inactif');
